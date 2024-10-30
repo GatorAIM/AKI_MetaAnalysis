@@ -38,50 +38,6 @@ from joblib import parallel_backend
 
 import utils_function
 
-def drop_too_much_nan(site, year, newdfs, threshold, keep_med=True):
-    '''
-    Depreciated, look at drop_too_much_nan_positive_parallel
-    '''          
-    print('Remove sparse feature on site '+site+":"+str(year), flush = True)                        
-    allcols = []
-    for newdf in newdfs:
-        allcols = allcols + list(newdf.columns)
-    allcols = np.unique(np.array(allcols))
-    allcols = allcols[allcols != 'FLAG']
-    allcols = allcols[allcols != 'PATID']
-    allcols = allcols[allcols != 'ENCOUNTERID']
-
-    flag0nan = {key: 0 for key in allcols}
-    flag1nan = {key: 0 for key in allcols}
-    flag0total = 0
-    flag1total = 0
-
-    for newdf in newdfs:
-        btX = newdf.replace(False, np.nan)
-        flag0total += np.logical_not(btX['FLAG']).sum()
-        flag1total += btX['FLAG'].sum()    
-        for col in allcols:
-            if col in newdf.columns:
-                flag0nan[col] += np.logical_and(np.logical_not(btX['FLAG']), np.isnan(btX[col])).sum()
-                flag1nan[col] += np.logical_and(btX['FLAG'], np.isnan(btX[col])).sum()
-            else:
-                flag0nan[col] += np.logical_not(btX['FLAG']).sum()
-                flag1nan[col] += btX['FLAG'].sum()
-                
-    remlist = []        
-    for col in allcols:
-#        print(col, flag0nan[col]/flag0total, flag1nan[col]/flag1total)        
-        if flag0nan[col]/flag0total >= 1-threshold and flag1nan[col]/flag1total >= 1-threshold:
-            remlist = remlist + [col]
-
-    if keep_med:
-        remlist = [x for x in remlist if 'MED' not in x]
-            
-    for i in range(len(newdfs)):
-        newdfs[i] = newdfs[i].drop(remlist,axis=1, errors='ignore')
-
-    return newdfs, remlist, flag0nan, flag1nan, flag0total, flag1total
-
 def drop_too_much_nan_positive(site, year, newdfs, threshold, keep_med=True):
     '''
     This module drop n% missing data in target class, for boolean class it drop less then n% TRUE
@@ -129,95 +85,6 @@ def drop_too_much_nan_positive(site, year, newdfs, threshold, keep_med=True):
         newdfs[i] = newdfs[i].drop(remlist,axis=1, errors='ignore')
         
     return newdfs, remlist, flag0nan, flag1nan, flag0total, flag1total
-
-def drop_too_much_nan_positive_parallel(site, year, newdfs, threshold, keep_med=True, n_jobs=1):
-    '''
-    This module drop n% missing data in target class, for boolean class it drop less then n% TRUE
-    '''    
-    '''
-    Depreciated, look at drop_too_much_nan_positive
-    '''       
-    
-    print('Remove sparse feature on site '+site+":"+str(year), flush = True)                        
-    allcols = []
-    for newdf in newdfs:
-        allcols = allcols + list(newdf.columns)
-    allcols = np.unique(np.array(allcols))
-    allcols = allcols[allcols != 'FLAG']
-    allcols = allcols[allcols != 'PATID']
-    allcols = allcols[allcols != 'ENCOUNTERID']
-
-    # Count nan/False for data of different year
-    def nan_count(newdf, allcols):
-        flag0nan = {key: 0 for key in allcols}
-        flag1nan = {key: 0 for key in allcols}
-        flag0total = 0
-        flag1total = 0
-
-        btX = newdf.replace(False, np.nan)
-        flag0total += np.logical_not(btX['FLAG']).sum()
-        flag1total += btX['FLAG'].sum()    
-        for col in allcols:
-            if col in newdf.columns:
-                flag1nan[col] += np.logical_and(btX['FLAG'], np.isnan(btX[col])).sum()
-            else:
-                flag1nan[col] += btX['FLAG'].sum()
-        return flag0nan, flag1nan, flag0total, flag1total
-
-#    Segmentation error
-    nan_list = Parallel(n_jobs=n_jobs)(delayed(nan_count)(newdf, allcols) for newdf in newdfs)
-#    nan_list = [nan_count(newdf, allcols) for newdf in newdfs]
-
-    flag0nan = {key: 0 for key in allcols}
-    flag1nan = {key: 0 for key in allcols}
-    flag0total = 0
-    flag1total = 0
-
-    # Add up the count of different data year for missing data and total row
-    for i in range(len(nan_list)):
-        for k, v in nan_list[i][0].items():
-            flag0nan[k] += v
-        for k, v in nan_list[i][1].items():
-            flag1nan[k] += v
-        flag0total += nan_list[i][2]
-        flag1total += nan_list[i][3]        
-
-    # Create list for dropping 
-    remlist = []        
-    for col in allcols:
-        # Only consider positive class
-        if flag1nan[col]/flag1total >= 1-threshold:
-            remlist = remlist + [col]
-    
-    # Keeping the medication variable even if it satisfy the condition
-    if keep_med:
-        remlist = [x for x in remlist if 'MED' not in x]
-    
-    # Drop the columns
-    for i in range(len(newdfs)):
-        newdfs[i] = newdfs[i].drop(remlist,axis=1, errors='ignore')
-        
-    return newdfs
-
-
-def bt_ckd(site, year, newdf):             
-    '''
-    Depreciated
-    '''    
-    #lab_num
-    configs_variables = utils_function.read_config(site)
-    datafolder = configs_variables['datafolder']    
-    
-    print('Merging ckd_info on site '+site+":"+str(year), flush = True)                
-    try:
-        efgr2 = pd.read_pickle(datafolder+site+'/p0_'+'ckdgroup'+'_'+site+'.pkl')
-        return pd.merge(newdf, efgr2, left_on=['PATID', 'ENCOUNTERID'], right_on=['PATID', 'ENCOUNTERID'], how='left')
-    except FileNotFoundError:
-        logging.basicConfig(filename='BT.log', filemode='a')    
-        print('No efgr table!!!!! '+site+":"+str(year), flush = True)
-        logging.error('No efgr table!!!!! '+site+":"+str(year))
-        logging.shutdown()
-        return newdf
 
 def bt_postprocess(site, year, newdf):
     '''
@@ -335,61 +202,7 @@ def correct_dtypes(datanew, site, stg):
     # Apply the original column datatype to data
     datanew = datanew.astype(datatype_list)
     return datanew    
-    
-def combinebtpos_old(site, yearX, stg, threshold=0.01, n_jobs=1):
-    '''
-    Depreciated, look at combinebtpos
-    '''       
 
-    configs_variables = utils_function.read_config(site)
-    datafolder = configs_variables['datafolder']    
-    
-    onset = pd.read_pickle(datafolder+site+'/p0_onset_'+site+'.pkl')
-    years = list(pd.to_datetime(onset['ADMIT_DATE']).dt.year.unique())    
-    bt_list = list()
-
-    for year in years:
-        try:
-            data = pd.read_pickle(datafolder+site+'/bt3_'+site+'_'+str(year)+'.pkl')
-            data = flag_convert(data, stg)
-            # col = data.columns
-            # n=int(data.shape[0]/n_jobs)+1
-            # chunks = [data[i:i+n].copy() for i in range(0,data.shape[0],n)]            
-            # bt_list = bt_list+chunks
-            bt_list.append(data.copy())            
-        except:
-            print(str(year)+' not exists')
-
-    #    bt_list, remlist, flag0nan, flag1nan, flag0total, flag1total = drop_too_much_nan(site, yearX, bt_list, threshold)
-    bt_list, remlist, flag0nan, flag1nan, flag0total, flag1total = drop_too_much_nan_positive(site, yearX, bt_list, threshold)
-#    bt_list = drop_too_much_nan_positive_parallel(site, yearX, bt_list, threshold, n_jobs=n_jobs)
-
-#    xxx = [list(bt.columns) for bt in bt_list]
-#    allcols = np.unique([item for sublist in xxx for item in sublist])    
-#    for i in range(len(bt_list)):
-#        bt_list[i] = bt_list[i].reindex(columns=allcols)    
-    bt_all = pd.concat(bt_list, ignore_index=True)
-
-    # replace nan in boolean columns with False
-    bt_bool = bt_all.select_dtypes('O').columns
-    bt_all[bt_bool] = bt_all[bt_bool].fillna(False)
-
-    def fillnap(bt_all, bt_bool):
-        bt_all[bt_bool] = bt_all[bt_bool].fillna(False)
-        return bt_all
-    
-    col = bt_all.columns
-    n=int(bt_all.shape[0]/n_jobs)+1
-    chunks = [bt_all[i:i+n].copy() for i in range(0,bt_all.shape[0],n)]
-    bt_all = Parallel(n_jobs=n_jobs)(delayed(fillnap)(chunk, bt_bool) for chunk in chunks)
-    bt_all = np.concatenate(bt_all)
-    bt_all = pd.DataFrame(bt_all, columns = col)
-
-    bt_all = bt_ckd(site, yearX, bt_all)
-    bt_all = bt_postprocess(site, yearX, bt_all)
-    bt_all.to_pickle(datafolder+site+'/bt3pos_'+site+'_'+stg+'_3000.pkl')
-
-    
 def process_covid(configs_variables, data, covid):
     
     print('Processin bt3nocovid_ on site '+configs_variables['site'], flush = True)
@@ -445,7 +258,6 @@ def combinebtpos(configs_variables, yearX=3000, n_jobs=1):
          
             
     # drop columns withg too much missing data
-#    bt_list = drop_too_much_nan_positive_parallel(site, yearX, bt_list, threshold, n_jobs=n_jobs)
     bt_list, remlist, flag0nan, flag1nan, flag0total, flag1total = drop_too_much_nan_positive(site, yearX, bt_list, threshold, keep_med=True)
 
     # Collect all columns from different tables
@@ -493,9 +305,5 @@ def combinebtpos(configs_variables, yearX=3000, n_jobs=1):
     # Saveguard
     bt_all = bt_all.drop_duplicates()
     bt_all.to_pickle(datafolder+site+'/bt3pos_'+site+'_'+stg+'_3000.pkl')
-    
-#if __name__ == "__main__":
-#    combinebtpos('KUMC', 3000, 'stg01', threshold=0.01, n_jobs=20)
-#    combinebtpos('KUMC', 3000, 'stg23', threshold=0.01, n_jobs=20)
-#    combinebtpos('KUMC', 3000, 'stg123', threshold=0.01, n_jobs=20)    
+      
 

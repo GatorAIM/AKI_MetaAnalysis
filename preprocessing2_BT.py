@@ -43,8 +43,6 @@ def bt_onset(configs_variables, year):
     '''
     site, datafolder, home_directory = utils_function.get_commons(configs_variables)
     
-    
-    
     print('Merging onset on site '+site+":"+str(year), flush = True)    
     try:
         return pd.read_pickle(datafolder+site+'/onset_'+site+'_'+str(year)+'.pkl')
@@ -207,27 +205,6 @@ def bt_labnum(configs_variables, year, newdf):
         logging.error('No lab_num table!!!!! '+site+":"+str(year))
         logging.shutdown()
         return newdf
-    
-def drop_too_much_nan(configs_variables, year, newdf, threshold=0.05):
-    '''
-    This module read drop columns with 95% missing data in targeted class
-    '''
-    site, datafolder, home_directory = utils_function.get_commons(configs_variables)
-    
-    
-    
-    print('Remove sparse feature on site '+site+":"+str(year), flush = True)                        
-    btX = newdf.replace(False, np.nan)
-    #limitPer = len(btX) * threshold
-    #col = btX.dropna(thresh=limitPer, axis=1).columns
-    btX0 = btX[btX['FLAG']==0]
-    btX1 = btX[btX['FLAG']==1]
-    limitPer0 = len(btX0) * threshold
-    limitPer1 = len(btX1) * threshold
-    col0 = btX0.dropna(thresh=limitPer0, axis=1).columns
-    col1 = btX1.dropna(thresh=limitPer1, axis=1).columns
-    col = list(set(list(col1)+list(col0)))
-    return newdf[col]
 
 def handpickremoval(configs_variables, year, newdf):   
     '''
@@ -257,60 +234,6 @@ def handpickremoval(configs_variables, year, newdf):
     
     return newdf.drop(remlist3,axis=1, errors='ignore')
 
-# def drop_corr(configs_variables, year, newdf, threshold=0.5):
-#     print('Remove correlated feature on site '+site+":"+str(year), flush = True)                        
-#     corr = newdf.corr()
-#     columns = np.full((corr.shape[0],), True, dtype=bool)
-#     for i in range(corr.shape[0]):
-#         for j in range(i+1, corr.shape[0]):
-#             if corr.iloc[i,j] >= threshold:
-#                 # if corr.columns[j] == 'ORIGINAL_BMI':
-#                 #     if columns[i]:
-#                 #         columns[i] = False
-#                 if columns[j]:
-#                     columns[j] = False
-#     selected_columns = newdf.columns[columns]
-#     return newdf[selected_columns]
-
-#Pearson
-def pearson_list(bt, threshold):
-    corr = bt.corr()
-    columns = np.full((corr.shape[0],), True, dtype=bool)
-    for i in range(corr.shape[0]):
-        for j in range(i+1, corr.shape[0]):
-            if corr.iloc[i,j] >= threshold:
-#                print(bt.columns[i], btcont.columns[j], corr.iloc[i,j])
-                if columns[j]:
-                    columns[j] = False
-    return columns   
-
-def point_biserial(btcat, btcon, threshold):
-    from scipy import stats
-    columns = np.full((btcat.shape[1],), True, dtype=bool)    
-    for i in range(btcon.shape[1]):
-        for j in range(btcat.shape[1]):
-            if stats.pointbiserialr(btcat.iloc[:,j], btcon.iloc[:,i])[0] >= threshold:            
-                if columns[j]:
-                    columns[j] = False
-    return columns
-    
-def drop_corr(configs_variables, year, bt, threshold):
-    bt2 = bt.reindex(sorted(bt.columns), axis=1)
-    btcat = bt2.select_dtypes('bool')
-    btcont = bt2.select_dtypes(exclude='bool')
-    return pd.concat([btcont.loc[:,pearson_list(btcont, threshold)], btcat.loc[:, (pearson_list(btcat, threshold) | point_biserial(btcat, btcon, threshold))]], axis=1)
-
-def drop_corr2(configs_variables, year, bt, threshold):
-    return bt.loc[:,pearson_list(bt, threshold)]
-
-def generate_drop_list(configs_variables, year, bt, threshold):
-    corr = bt.corr()
-    columns = np.full((corr.shape[0],), True, dtype=bool)
-    for i in range(corr.shape[0]):
-        for j in range(i+1, corr.shape[0]):
-            if corr.iloc[i,j] >= threshold:
-                print(configs_variables, year, bt.columns[i], btcont.columns[j], corr.iloc[i,j])        
-                
 def bigtable(configs_variables, year):
     '''
     This module combine different tables into one big table
@@ -351,11 +274,6 @@ def bigtable(configs_variables, year):
         newdf = bt_labnum(configs_variables, year, newdf)
         newdf = handpickremoval(configs_variables, year, newdf)
         
-        # Migrated to preprocessing4 module
-#        newdf = drop_too_much_nan(configs_variables, year, newdf, threshold=0.05)
-#        newdf = bt_postprocess(configs_variables, year, newdf)
-#        newdf = drop_corr2(configs_variables, year, newdf, threshold=0.5)        
-        
         #Save table
         newdf.to_pickle(datafolder+site+'/bt3_'+site+'_'+str(year)+'.pkl')
 
@@ -373,42 +291,5 @@ def bigtable(configs_variables, year):
         logging.error('OTHER ERROR!!!!! '+site+":"+str(year)+'\n+++++++++++++++++\n'+str(e)+'\n-------------------\n')
         logging.shutdown()       
         raise    
-        
-def bigtable_removal_only(configs_variables, year, stg, newdf):
-    '''
-    Depreciated
-    '''    
-    #Big Table
-    site, datafolder, home_directory = utils_function.get_commons(configs_variables)
-    print('BT removal on site '+site+":"+str(year), flush = True)
-
-    try:
-        newdf = pd.read_pickle(datafolder+site+'/bt3_'+site+'_'+stg+'_3000.pkl')      
-        newdf = handpickremoval(configs_variables, year, newdf)        
-        newdf.to_pickle('/home/hoyinchan/blue/Data/data2021/data2021/'+site+'/bt3_'+site+'_'+stg+'_3000.pkl')
-
-        #consistency check
-        if newdf.empty:
-            logging.basicConfig(filename='BT.log', filemode='a')    
-            print('DATAFRAME EMPTY!!!!!! '+site+":"+str(year), flush = True)
-            logging.error('BT: DATAFRAME EMPTY!!!!!! '+site+":"+str(year))
-            logging.shutdown()
-
-        print('Finished bt on site '+site+":"+str(year), flush = True)        
-    except Exception as e:
-        logging.basicConfig(filename='BT.log', filemode='a')    
-        print('OTHER ERROR!!!!! '+site+":"+str(year)+'\n+++++++++++++++++\n'+str(e)+'\n-------------------\n', flush = True)
-        logging.error('OTHER ERROR!!!!! '+site+":"+str(year)+'\n+++++++++++++++++\n'+str(e)+'\n-------------------\n')
-        logging.shutdown()       
-        raise    
-        
-def bigtable_nocovid(configs_variables):
-    
-    site, datafolder, home_directory = utils_function.get_commons(configs_variables)    
-    if not configs_variables['rerun_flag'] and os.path.exists(datafolder+site+'/bt3nocovid_'+site+'_3000.pkl'):
-        print('Existed: bt3nocovid_'+site+'_'+'3000.pkl')
-        return     
-    
-    print('Processin bt3nocovid_ on site '+site+":", flush = True)
     
     
