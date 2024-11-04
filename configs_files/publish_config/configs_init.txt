@@ -1,0 +1,51 @@
+# Paths
+datafolder_base = '/blue/yonghui.wu/hoyinchan/Data/data2022raw/'
+datafolder = '/blue/yonghui.wu/hoyinchan/Data/data2022/'
+home_directory = "/home/hoyinchan/code/AKI_CDM_PY/"
+
+# Label definition
+#stg = "stg123" #AKI1 vs AKI2 vs AKI3
+#stg = "stg23" #AKI1 vs AKI2/3
+stg = "stg01" #AKI vs non-AKI
+
+# Covariate included
+#fs = 'rmlab' #Remove Labs
+#fs = 'onlymed' #Include only medication
+#fs = 'rmscrbun' #Remove sCr, BUN
+fs = 'nofs' #Include all
+
+# Oversampling Strategy
+#oversample = 'cp' #Copying
+#oversample = 'sm' #SMOTE
+oversample = 'raw' #No oversampling
+
+# Model selection
+#model_type = ['xgbhgs', 'xgbbs', 'catr', 'catd']
+model_type = 'catd' #Catboost
+
+# Threshold for which columns with lower percentage of non-missing data will be dropped
+threshold_for_too_much_nan = 0.05
+
+# For test train split
+test_size = 0.2
+
+# For reproducability
+random_state = 0
+
+# For cross validation
+n_splits = 10
+
+# Threshold correlation
+threshold_correlation = 0.8
+
+# if ignore existing data
+rerun_flag = True
+
+# if vital and lab need to remove outliner
+remove_outliner_flag = True
+
+# if include covid patient
+covid = 'NOCOVID' #'BOTH', 'COVID'
+
+#if catboost run on dataset with removed correlation
+drop_correlation_catboost = True
