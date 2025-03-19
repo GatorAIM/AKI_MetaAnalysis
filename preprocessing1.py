@@ -234,9 +234,6 @@ def demo(configs_variables, year):
     site, datafolder, home_directory = utils_function.get_commons(configs_variables)    
     print('Running demo on site '+site+":"+str(year), flush = True)
 
-    
-        
-
     if not configs_variables['rerun_flag'] and os.path.exists(datafolder+site+'/demo_'+site+'_'+str(year)+'.pkl'):
         print('Existed: demo_'+site+'_'+str(year)+'.pkl')
         return        
@@ -247,6 +244,9 @@ def demo(configs_variables, year):
     demo['ENCOUNTERID'] = demo['ENCOUNTERID'].astype(str)    
     demo['AGE'] = demo['AGE'].astype(float)
     demo = demo.drop_duplicates()
+
+    # Remove duplicates death source
+    demo = demo.sort_values('DEATH_DATE').groupby(['PATID', 'ENCOUNTERID']).first().reset_index()
     
     # Get the patient records in onset
     newdfX = pd.read_pickle(datafolder+site+'/onset_'+site+'_'+str(year)+'.pkl')
